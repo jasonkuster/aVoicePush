@@ -24,10 +24,24 @@
                      IsIndeterminate="True"
                      HorizontalAlignment="Stretch"/>
         
+        <ListBox x:Name="MessagesListBox"
+                 Grid.Row="1"
+                 Background="Transparent">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel Height="50">
+                        <TextBlock Foreground="White" FontSize="16" Height="20" Text="{Binding Participant}"/>
+                        <TextBlock Foreground="Gray" FontSize="20" Height="30" Text="{Binding FirstMessage}"/>
+                    </StackPanel>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+        
         <WebView x:Name="GvWebView"
                  Grid.Row="1"
                  NavigationStarting="GvWebView_NavigationStarting"
-                 NavigationCompleted="GvWebView_NavigationCompleted"/>
+                 NavigationCompleted="GvWebView_NavigationCompleted"
+                 Visibility="Collapsed"/>
         
     </Grid>
     

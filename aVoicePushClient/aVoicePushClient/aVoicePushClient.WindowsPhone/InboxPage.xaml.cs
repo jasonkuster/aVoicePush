@@ -19,11 +19,38 @@ using Windows.UI.Xaml.Data;
 using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Navigation;
+using HtmlAgilityPack;
 
 // The Basic Page item template is documented at http://go.microsoft.com/fwlink/?LinkID=390556
 
 namespace aVoicePushClient
 {
+
+    public class MessageThread
+    {
+        public string Participant { get; set; }
+        public List<Message> Messages { get; set; }
+        public string FirstMessage
+        {
+            get
+            {
+                return Messages.First().Content;
+            }
+        }
+
+        public MessageThread()
+        {
+            Messages = new List<Message>();
+        }
+    }
+
+    public class Message
+    {
+        public string Content { get; set; }
+        public string Sender { get; set; }
+        public string Time { get; set; }
+    }
+
     /// <summary>
     /// An empty page that can be used on its own or navigated to within a Frame.
     /// </summary>
@@ -214,10 +241,59 @@ namespace aVoicePushClient
         {
             PageProgress.Visibility = Visibility.Collapsed;
 
+            List<MessageThread> threads = new List<MessageThread>();
+
             if (!args.IsSuccess)
             {
                 MessageDialog dialog = new MessageDialog("There's a problem with the webpage. Try refreshing. " + args.WebErrorStatus.ToString());
                 await dialog.ShowAsync();
+            }
+            else if (sender.Source.ToString().Contains(HOME_URL))
+            {
+                string html = await sender.InvokeScriptAsync("eval", new string[] { "document.documentElement.outerHTML;" });
+                HtmlDocument doc = new HtmlDocument();
+                doc.LoadHtml(html);
+                var divs = doc.DocumentNode.Descendants("div")
+                    .Where(d => d.Attributes.Contains("class") && d.Attributes["class"].Value.Contains("mr"));
+                foreach(var message in divs) {
+                    var recip_node = message.Descendants("a")
+                        .Where(a => a.Attributes.Contains("href") && a.Attributes["href"].Value.Contains("/voice/m/contact/"))
+                        .FirstOrDefault();
+                    if (recip_node != null)
+                    {
+                        string recip = recip_node.InnerText;
+                        var msg_nodes = message.Descendants("div")
+                            .Where(d => d.Attributes.Contains("class") && d.Attributes["class"].Value.Equals("ms3"))
+                            .FirstOrDefault()
+                            .Descendants("div")
+                            .Where(d => !d.Attributes.Contains("class") || !d.Attributes["class"].Value.Equals("ms2"));
+                        List<Message> convo_messages = new List<Message>();
+                        foreach (var message_contents in msg_nodes)
+                        {
+                            string message_sender = message_contents.Descendants("span")
+                                .Where(s => s.GetAttributeValue("class", "").Equals("sf"))
+                                .FirstOrDefault()
+                                .Descendants("b")
+                                .FirstOrDefault()
+                                .InnerText
+                                .Trim()
+                                .Replace(":", "");
+                            string message_content = message_contents.Descendants("span")
+                                .Where(s => !s.Attributes.Contains("class"))
+                                .FirstOrDefault()
+                                .InnerText
+                                .Trim();
+                            string message_time = message_contents.Descendants("span")
+                                .Where(s => s.GetAttributeValue("class", "").Equals("ms"))
+                                .FirstOrDefault()
+                                .InnerText
+                                .Trim();
+                            convo_messages.Add(new Message { Sender = message_sender, Content = message_content, Time = message_time });
+                        }
+                        threads.Add(new MessageThread() { Messages = convo_messages, Participant = recip });
+                    }
+                }
+                MessagesListBox.ItemsSource = threads;
             }
         }
 
